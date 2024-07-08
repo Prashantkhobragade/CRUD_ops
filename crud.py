@@ -27,7 +27,7 @@ DB_PARAMS = {
     'host': HOST,
     'port': PORT
 }
-
+print (DB_PARAMS)
 #Establish connection to the PostgresSQL DB
 
 def connect():
