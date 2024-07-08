@@ -5,6 +5,7 @@ from psycopg2 import sql
 from typing import List
 import os
 from dotenv import load_dotenv
+import logging
 
 
 load_dotenv()
@@ -19,6 +20,8 @@ PORT = os.environ['PORT']
 
 app = FastAPI()
 
+logging.basicConfig(level=logging.DEBUG)
+
 #database connection parameters
 DB_PARAMS = {
     'dbname': DB_NAME,
@@ -27,7 +30,7 @@ DB_PARAMS = {
     'host': HOST,
     'port': PORT
 }
-print (DB_PARAMS)
+
 #Establish connection to the PostgresSQL DB
 
 def connect():
@@ -35,6 +38,7 @@ def connect():
         conn = psycopg2.connect(**DB_PARAMS)
         return conn
     except Exception as e:
+        logging.error(f"Error connecting to the DB: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # create employees table if it does not exist
@@ -55,6 +59,7 @@ def create_employees_table():
         cur.close()
         conn.close()
     except Exception as e:
+        logging.error(f"Error creating table: {e}")
         raise HTTPException(status_code=500, detail = str(e))
     
 
@@ -94,6 +99,7 @@ def create_employee(employee: Employee):
         conn.close()
         return {**employee.model_dump(), "employee_id":employee_id}
     except Exception as e:
+        logging.error(f"Error while inserting data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.get("/employees/", response_model=List[Employee])
@@ -108,6 +114,7 @@ def read_employees():
         conn.close()
         return [Employee(employee_id=row[0], name=row[1], age=row[2], department = row[3]) for row in rows]
     except Exception as e:
+        logging.error(f"Error while reading data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 
