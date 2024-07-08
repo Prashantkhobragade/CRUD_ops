@@ -1,0 +1,10 @@
+applications:
+- name: Crud_DB
+  random-route : true
+  path: ./
+  memory: 128M
+  buildpacks:
+  - python_buildpack
+  command: python crud:app --reload --host 0.0.0.0 --port 8000
+  services:
+  - postgresql

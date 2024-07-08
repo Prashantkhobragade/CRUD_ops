@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 import psycopg2
 from psycopg2 import sql
@@ -31,13 +31,19 @@ DB_PARAMS = {
 #Establish connection to the PostgresSQL DB
 
 def connect():
-    return psycopg2.connect(**DB_PARAMS)
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        return conn
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # create employees table if it does not exist
+
 def create_employees_table():
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute("""
+    try:
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS employees (
                 employee_id SERIAL PRIMARY KEY, 
                 name VARCHAR(50),
@@ -45,9 +51,20 @@ def create_employees_table():
                 department VARCHAR(50)
                 )
                 """)
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail = str(e))
+    
+
+# Middleware to ensure the table is created
+@app.middleware("http")
+async def db_middleware(request: Request, call_next):
+    create_employees_table()
+    response = await call_next(request)
+    return response
+
 
 class Employee(BaseModel):
     employee_id:int 
@@ -60,7 +77,7 @@ class EmployeeUpdate(BaseModel):
     age: int = None
     department: str = None
 
-@app.post("/employee/", response_model=Employee)
+@app.post("/employee/")
 def create_employee(employee: Employee):
     try:
         conn = connect()
