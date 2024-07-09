@@ -7,7 +7,9 @@ import os
 from dotenv import load_dotenv
 import logging
 
+
 load_dotenv()
+
 
 DB_NAME = os.environ['DB_NAME']
 USER = os.environ['USER']
@@ -15,11 +17,12 @@ PASSWORD = os.environ['PASSWORD']
 HOST = os.environ['HOST']
 PORT = os.environ['PORT']
 
+
 app = FastAPI()
 
 logging.basicConfig(level=logging.DEBUG)
 
-# Database connection parameters
+#database connection parameters
 DB_PARAMS = {
     'dbname': DB_NAME,
     'user': USER,
@@ -28,36 +31,42 @@ DB_PARAMS = {
     'port': PORT
 }
 
-# Establish connection to the PostgreSQL DB
+#Establish connection to the PostgresSQL DB
+
 def connect():
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         return conn
     except Exception as e:
         logging.error(f"Error connecting to the DB: {e}")
-        raise Exception("Database connection error")
+        raise HTTPException(status_code=500, detail=str(e))
 
+# create employees table if it does not exist
+
+
+    
+""""
 # Middleware to ensure the table is created
 @app.middleware("http")
 async def db_middleware(request: Request, call_next):
-    try:
-        create_employees_table()
-    except Exception as e:
-        logging.error(f"Error in middleware during table creation: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    create_employees_table()
     response = await call_next(request)
     return response
+"""
 
 class Employee(BaseModel):
+    employee_id:int 
     name: str
     age: int
-    department: str
+    department: str 
 
 class EmployeeUpdate(BaseModel):
     name: str = None
     age: int = None
     department: str = None
 
+
+@app.post('/creat_table/')
 def create_employees_table():
     try:
         conn = connect()
@@ -75,16 +84,19 @@ def create_employees_table():
         conn.close()
     except Exception as e:
         logging.error(f"Error creating table: {e}")
-        raise Exception("Table creation error")
+        raise HTTPException(status_code=500, detail = str(e))
+    
+
+
 
 @app.post("/employee/")
-async def create_employee(employee: Employee):
+def create_employee(employee: Employee):
     try:
         conn = connect()
         cur = conn.cursor()
         query = """
-                INSERT INTO employees (name, age, department)
-                VALUES (%s, %s, %s)
+                INSERT INTO employees (employee_id, name, age, department)
+                VALUES (%s, %s, %s, %s)
                 RETURNING employee_id
             """
         cur.execute(query, (employee.name, employee.age, employee.department))
@@ -92,13 +104,13 @@ async def create_employee(employee: Employee):
         conn.commit()
         cur.close()
         conn.close()
-        return {**employee.model_dump(), "employee_id": employee_id}
+        return {**employee.model_dump(), "employee_id":employee_id}
     except Exception as e:
         logging.error(f"Error while inserting data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 @app.get("/employees/", response_model=List[Employee])
-async def read_employees():
+def read_employees():
     try:
         conn = connect()
         cur = conn.cursor()
@@ -107,28 +119,16 @@ async def read_employees():
         rows = cur.fetchall()
         cur.close()
         conn.close()
-        return [Employee(employee_id=row[0], name=row[1], age=row[2], department=row[3]) for row in rows]
+        return [Employee(employee_id=row[0], name=row[1], age=row[2], department = row[3]) for row in rows]
     except Exception as e:
         logging.error(f"Error while reading data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
 
-# Optional: Endpoint to explicitly create the table
-@app.post("/create_table/")
-async def create_table():
-    try:
-        create_employees_table()
-        return {"message": "Table created successfully"}
-    except Exception as e:
-        logging.error(f"Error creating table: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-# Optional: Endpoint to add employees separately
-@app.post("/add_employee/")
-async def add_employee(employee: Employee):
-    return await create_employee(employee)
 
-# Run the code
+
+#Run the code
 if __name__ == "__main__":
     import uvicorn
-    create_employees_table()  # Ensure table creation at startup
     uvicorn.run(app, host="0.0.0.0", port=8080)
